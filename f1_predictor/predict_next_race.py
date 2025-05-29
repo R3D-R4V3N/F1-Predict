@@ -130,6 +130,10 @@ def _prepare_prediction_dataframe(df_hist: pd.DataFrame, year: int, rnd: int) ->
         "racefans_rating",
         "air_temp",
         "humidity",
+        "circuit_id",
+        "track_length",
+        "pit_stops",
+        "overtake_difficulty",
     ]:
         if col in latest.columns:
             latest[col] = np.nan
@@ -145,9 +149,21 @@ def _prepare_prediction_dataframe(df_hist: pd.DataFrame, year: int, rnd: int) ->
     if "FastestLapSpeed" in df_all.columns:
         df_all.rename(columns={"FastestLapSpeed": "fastest_lap_speed"}, inplace=True)
 
+    if "track_length" in df_all.columns:
+        df_all["track_length"] = pd.to_numeric(df_all["track_length"], errors="coerce")
+    else:
+        df_all["track_length"] = np.nan
+    df_all["overtake_difficulty"] = 1 / df_all["track_length"]
+    if "pit_stops" in df_all.columns:
+        df_all["pit_stops"] = pd.to_numeric(df_all["pit_stops"], errors="coerce")
+    else:
+        df_all["pit_stops"] = np.nan
+    if "circuit_id" not in df_all.columns:
+        df_all["circuit_id"] = np.nan
+
     df_all.sort_values(["driver_id", "year", "round"], inplace=True)
 
-    for col in ["Points", "Position", "fastest_lap_time", "fastest_lap_speed"]:
+    for col in ["Points", "Position", "fastest_lap_time", "fastest_lap_speed", "pit_stops"]:
         if col in df_all.columns:
             feat_name = f"{col.lower()}_ewm"
             df_all[feat_name] = _ewm_feature(df_all, col)
@@ -166,11 +182,16 @@ def _prepare_prediction_dataframe(df_hist: pd.DataFrame, year: int, rnd: int) ->
         numeric_features.append("fastest_lap_time")
     if "fastest_lap_speed" in df_all.columns:
         numeric_features.append("fastest_lap_speed")
+    if "track_length" in df_all.columns:
+        numeric_features.append("track_length")
+        numeric_features.append("overtake_difficulty")
+    if "pit_stops" in df_all.columns:
+        numeric_features.append("pit_stops")
     if "air_temp" in df_all.columns:
         numeric_features.append("air_temp")
     if "humidity" in df_all.columns:
         numeric_features.append("humidity")
-    for col in ["points_cumsum", "points_ewm", "position_ewm", "fastest_lap_time_ewm", "fastest_lap_speed_ewm"]:
+    for col in ["points_cumsum", "points_ewm", "position_ewm", "fastest_lap_time_ewm", "fastest_lap_speed_ewm", "pit_stops_ewm"]:
         if col in df_all.columns:
             numeric_features.append(col)
 
@@ -178,6 +199,8 @@ def _prepare_prediction_dataframe(df_hist: pd.DataFrame, year: int, rnd: int) ->
     categorical_features = ["driver_id"]
     if "TeamName" in df_all.columns:
         categorical_features.append("TeamName")
+    if "circuit_id" in df_all.columns:
+        categorical_features.append("circuit_id")
     feature_cols = numeric_features + categorical_features
 
     preprocessor: ColumnTransformer = joblib.load(MODEL_PATH)
