@@ -55,6 +55,10 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
                 time.sleep(5)
         if races.empty:
             continue
+        circuit_df = loader.parse_circuit_info(races)
+        circuit_map = {
+            (int(row["year"]), int(row["round"])): row for _, row in circuit_df.iterrows()
+        }
         for _, race in races.iterrows():
             try:
                 rnd = int(race.get("round") or race.get("Round"))
@@ -80,6 +84,26 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
                 continue
             results["year"] = year
             results["round"] = rnd
+            circ_info = circuit_map.get((year, rnd))
+            if circ_info is not None:
+                for col, val in circ_info.items():
+                    results[col] = val
+
+            track_len = None
+            try:
+                ci = getattr(session, "get_circuit_info", None)
+                ci = ci() if callable(ci) else getattr(session, "circuit_info", None)
+                if ci:
+                    if isinstance(ci, dict):
+                        track_len = ci.get("Length") or ci.get("length")
+                    else:
+                        track_len = getattr(ci, "Length", None) or getattr(ci, "length", None)
+                    if isinstance(track_len, str):
+                        track_len = track_len.replace("km", "").strip()
+                    track_len = float(track_len)
+            except Exception:  # pragma: no cover - unsupported structure
+                track_len = None
+            results["track_length"] = track_len
             rating = loader.fetch_racefans_rating(year, rnd)
             results["racefans_rating"] = rating
             frames.append(results)
