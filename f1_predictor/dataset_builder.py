@@ -68,9 +68,19 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
                 LOGGER.info("Skipping %s round %s (already processed)", year, rnd)
                 continue
             LOGGER.info("Processing %s round %s", year, rnd)
+            skip_race = False
             while True:
                 try:
                     session = loader.fetch_session(year, rnd, "R")
+                    break
+                except ValueError:
+                    LOGGER.exception(
+                        "Failed to fetch session %s round %s due to invalid data",
+                        year,
+                        rnd,
+                    )
+                    time.sleep(1)
+                    skip_race = True
                     break
                 except Exception:
                     LOGGER.exception(
@@ -79,6 +89,8 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
                         rnd,
                     )
                     time.sleep(5)
+            if skip_race:
+                continue
             results = getattr(session, "results", pd.DataFrame()).copy()
             if results.empty:
                 continue
