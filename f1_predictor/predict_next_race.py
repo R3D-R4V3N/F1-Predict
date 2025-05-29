@@ -77,7 +77,15 @@ def _prepare_prediction_dataframe(df_hist: pd.DataFrame, year: int, rnd: int) ->
     latest = df_hist.groupby("driver_id").tail(1).reset_index(drop=True)
     latest["year"] = year
     latest["round"] = rnd
-    for col in ["Position", "GridPosition", "FastestLapTime", "FastestLapSpeed", "racefans_rating"]:
+    for col in [
+        "Position",
+        "GridPosition",
+        "FastestLapTime",
+        "FastestLapSpeed",
+        "racefans_rating",
+        "air_temp",
+        "humidity",
+    ]:
         if col in latest.columns:
             latest[col] = np.nan
     if "Points" in latest.columns:
@@ -113,6 +121,10 @@ def _prepare_prediction_dataframe(df_hist: pd.DataFrame, year: int, rnd: int) ->
         numeric_features.append("fastest_lap_time")
     if "fastest_lap_speed" in df_all.columns:
         numeric_features.append("fastest_lap_speed")
+    if "air_temp" in df_all.columns:
+        numeric_features.append("air_temp")
+    if "humidity" in df_all.columns:
+        numeric_features.append("humidity")
     for col in ["points_cumsum", "points_ewm", "position_ewm", "fastest_lap_time_ewm", "fastest_lap_speed_ewm"]:
         if col in df_all.columns:
             numeric_features.append(col)
