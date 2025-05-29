@@ -77,7 +77,10 @@ def test_tsplit_order() -> None:
 def test_racefans_fallback(tmp_path, monkeypatch) -> None:
     csv_data = "year,round,rating\n2019,1,7.5\n"
 
+    calls = []
+
     def fake_get(self, url: str):
+        calls.append(url)
         if "main" in url:
             raise requests.HTTPError("404")
         return DummyCSVResponse(csv_data)
@@ -87,7 +90,17 @@ def test_racefans_fallback(tmp_path, monkeypatch) -> None:
     loader = DataLoader(cache_dir=tmp_path / "cache", raw_dir=tmp_path / "raw")
     rating = loader.fetch_racefans_rating(2019, 1)
 
+    main_url = (
+        "https://raw.githubusercontent.com/theoehrly/fastf1/main/docs/examples/"
+        "racefans_driver_ratings.csv"
+    )
+    master_url = (
+        "https://raw.githubusercontent.com/theoehrly/fastf1/master/docs/examples/"
+        "racefans_driver_ratings.csv"
+    )
+
     assert rating == 7.5
+    assert calls == [main_url, master_url]
 
 
 def test_extract_weather() -> None:

@@ -110,10 +110,8 @@ class DataLoader:
     def fetch_racefans_rating(self, year: int, round: int) -> Optional[float]:
         """Fetch racefans driver rating for a specific race."""
         urls = [
-            "https://raw.githubusercontent.com/theoehrly/fastf1/main/docs/examples/"
-            "racefans_driver_ratings.csv",
-            "https://raw.githubusercontent.com/theoehrly/fastf1/master/docs/examples/"
-            "racefans_driver_ratings.csv",
+            "https://raw.githubusercontent.com/theoehrly/fastf1/main/docs/examples/racefans_driver_ratings.csv",
+            "https://raw.githubusercontent.com/theoehrly/fastf1/master/docs/examples/racefans_driver_ratings.csv",
         ]
         dest = self.raw_dir / "racefans" / "driver_ratings.csv"
 
