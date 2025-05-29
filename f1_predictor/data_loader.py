@@ -147,3 +147,44 @@ class DataLoader:
         races = data.get("MRData", {}).get("RaceTable", {}).get("Races", [])
         stops = races[0].get("PitStops", []) if races else []
         return pd.DataFrame(stops)
+
+    def parse_circuit_info(self, races: pd.DataFrame) -> pd.DataFrame:
+        """Extract circuit information from an Ergast schedule dataframe.
+
+        Parameters
+        ----------
+        races:
+            DataFrame returned by :meth:`fetch_season`.
+
+        Returns
+        -------
+        pd.DataFrame
+            Circuit details indexed by year and round.
+        """
+
+        rows: list[dict[str, Any]] = []
+        for _, race in races.iterrows():
+            circuit = race.get("Circuit", {}) or {}
+            location = circuit.get("Location", {}) or {}
+            try:
+                year = int(race.get("season") or race.get("Season") or race.get("year"))
+            except Exception:  # pragma: no cover - malformed data
+                year = None
+            try:
+                rnd = int(race.get("round") or race.get("Round"))
+            except Exception:
+                continue
+            rows.append(
+                {
+                    "year": year,
+                    "round": rnd,
+                    "circuit_id": circuit.get("circuitId"),
+                    "circuit_name": circuit.get("circuitName"),
+                    "circuit_locality": location.get("locality"),
+                    "circuit_country": location.get("country"),
+                    "circuit_lat": float(location["lat"]) if "lat" in location else None,
+                    "circuit_long": float(location["long"]) if "long" in location else None,
+                }
+            )
+
+        return pd.DataFrame(rows)

@@ -77,6 +77,11 @@ def generate_feature_matrix(df_raw: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Seri
         numeric_features.append("fastest_lap_time")
     if "fastest_lap_speed" in df.columns:
         numeric_features.append("fastest_lap_speed")
+    if "track_length" in df.columns:
+        df["track_length"] = pd.to_numeric(df["track_length"], errors="coerce")
+        numeric_features.append("track_length")
+        df["overtake_difficulty"] = 1 / df["track_length"]
+        numeric_features.append("overtake_difficulty")
 
     df["points_cumsum"] = (
         df.groupby("driver_id")["Points"].cumsum().shift(1)
@@ -86,6 +91,8 @@ def generate_feature_matrix(df_raw: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Seri
     categorical_features = ["driver_id"]
     if "TeamName" in df.columns:
         categorical_features.append("TeamName")
+    if "circuit_id" in df.columns:
+        categorical_features.append("circuit_id")
 
     context_features = ["year", "round"]
     numeric_features.extend(context_features)
