@@ -82,6 +82,33 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
             results = getattr(session, "results", pd.DataFrame()).copy()
             if results.empty:
                 continue
+            # merge pit stop counts
+            try:
+                pits = loader.fetch_pit_summary(year, rnd)
+            except Exception:  # pragma: no cover - network/runtime errors
+                LOGGER.exception(
+                    "Failed to fetch pit summary for %s round %s", year, rnd
+                )
+                pits = pd.DataFrame()
+            if not pits.empty and "driverId" in pits.columns:
+                counts = (
+                    pits.groupby("driverId").size().reset_index(name="pit_stops")
+                )
+                merge_col = None
+                for col in ("driverId", "Driver", "driver"):
+                    if col in results.columns:
+                        merge_col = col
+                        break
+                if merge_col:
+                    results = results.merge(
+                        counts, how="left", left_on=merge_col, right_on="driverId"
+                    )
+                    if merge_col != "driverId":
+                        results.drop(columns=["driverId"], inplace=True)
+                else:
+                    results["pit_stops"] = counts["pit_stops"].mean()
+            elif "pit_stops" not in results.columns:
+                results["pit_stops"] = pd.NA
             results["year"] = year
             results["round"] = rnd
             circ_info = circuit_map.get((year, rnd))
