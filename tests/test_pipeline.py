@@ -6,6 +6,7 @@ from sklearn.model_selection import TimeSeriesSplit
 import pytest
 
 from f1_predictor.data_loader import DataLoader
+from f1_predictor.feature_engineering import generate_feature_matrix
 
 
 class DummyResponse:
@@ -85,3 +86,33 @@ def test_racefans_fallback(tmp_path, monkeypatch) -> None:
     rating = loader.fetch_racefans_rating(2019, 1)
 
     assert rating == 7.5
+
+
+def test_extract_weather() -> None:
+    loader = DataLoader(cache_dir="none", raw_dir="none")
+
+    class DummySession:
+        weather_data = pd.DataFrame({"AirTemp": [22.5], "Humidity": [55.0]})
+
+    weather = loader.extract_weather(DummySession())
+
+    assert weather["air_temp"] == 22.5
+    assert weather["humidity"] == 55.0
+
+
+def test_feature_matrix_with_weather() -> None:
+    df = pd.DataFrame(
+        {
+            "year": [2021, 2021],
+            "round": [1, 2],
+            "driver_id": [44, 44],
+            "Position": [1, 2],
+            "air_temp": [20.0, 21.0],
+            "humidity": [60.0, 58.0],
+            "Points": [25, 18],
+        }
+    )
+
+    X, _ = generate_feature_matrix(df)
+    assert any("air_temp" in c for c in X.columns)
+    assert any("humidity" in c for c in X.columns)

@@ -82,6 +82,9 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
             results["round"] = rnd
             rating = loader.fetch_racefans_rating(year, rnd)
             results["racefans_rating"] = rating
+            weather = loader.extract_weather(session)
+            results["air_temp"] = weather.get("air_temp")
+            results["humidity"] = weather.get("humidity")
             frames.append(results)
             processed_races.add((year, rnd))
 

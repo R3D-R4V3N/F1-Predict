@@ -77,6 +77,10 @@ def generate_feature_matrix(df_raw: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Seri
         numeric_features.append("fastest_lap_time")
     if "fastest_lap_speed" in df.columns:
         numeric_features.append("fastest_lap_speed")
+    if "air_temp" in df.columns:
+        numeric_features.append("air_temp")
+    if "humidity" in df.columns:
+        numeric_features.append("humidity")
 
     df["points_cumsum"] = (
         df.groupby("driver_id")["Points"].cumsum().shift(1)

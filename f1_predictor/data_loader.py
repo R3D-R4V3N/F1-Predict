@@ -147,3 +147,22 @@ class DataLoader:
         races = data.get("MRData", {}).get("RaceTable", {}).get("Races", [])
         stops = races[0].get("PitStops", []) if races else []
         return pd.DataFrame(stops)
+
+    def extract_weather(self, session: fastf1.core.Session) -> dict[str, Optional[float]]:
+        """Return air temperature and humidity for a loaded session."""
+        try:
+            weather = session.weather_data  # type: ignore[attr-defined]
+        except Exception:  # pragma: no cover - fastf1 internals may fail
+            weather = None
+
+        if weather is None or getattr(weather, "empty", True):
+            return {"air_temp": None, "humidity": None}
+
+        row = weather.iloc[0]
+        air = pd.to_numeric(row.get("AirTemp"), errors="coerce")
+        hum = pd.to_numeric(row.get("Humidity"), errors="coerce")
+
+        return {
+            "air_temp": float(air) if not pd.isna(air) else None,
+            "humidity": float(hum) if not pd.isna(hum) else None,
+        }
