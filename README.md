@@ -29,6 +29,8 @@ High level architecture:
 `dataset_builder.py` orchestrates data collection. It iterates over seasons,
 fetching each race with `DataLoader` and saving the merged result at
 `data/processed/f1_dataset.parquet`【F:f1_predictor/dataset_builder.py†L16-L68】.
+The builder now loads this file if it exists and skips already processed races,
+allowing interrupted runs to resume where they left off.
 Run it with:
 ```bash
 python -m f1_predictor.dataset_builder --seasons 2019 2020 2021

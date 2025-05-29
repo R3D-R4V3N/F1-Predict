@@ -32,6 +32,15 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
     """
     loader = DataLoader()
     frames: list[pd.DataFrame] = []
+    processed_races: set[tuple[int, int]] = set()
+
+    if PROCESSED_PATH.exists():
+        existing = pd.read_parquet(PROCESSED_PATH)
+        frames.append(existing)
+        processed_races = set(
+            zip(existing["year"].astype(int), existing["round"].astype(int))
+        )
+        LOGGER.info("Loaded existing dataset with %s rows", len(existing))
 
     for year in seasons:
         LOGGER.info("Fetching season %s", year)
@@ -50,6 +59,9 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
             try:
                 rnd = int(race.get("round") or race.get("Round"))
             except Exception:
+                continue
+            if (year, rnd) in processed_races:
+                LOGGER.info("Skipping %s round %s (already processed)", year, rnd)
                 continue
             LOGGER.info("Processing %s round %s", year, rnd)
             while True:
@@ -71,6 +83,7 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
             rating = loader.fetch_racefans_rating(year, rnd)
             results["racefans_rating"] = rating
             frames.append(results)
+            processed_races.add((year, rnd))
 
     if not frames:
         raise RuntimeError("No data collected")
