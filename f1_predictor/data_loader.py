@@ -49,7 +49,13 @@ class DataLoader:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.raw_dir = Path(raw_dir or "data/raw")
         self.raw_dir.mkdir(parents=True, exist_ok=True)
-        fastf1.Cache.enable_cache(str(self.cache_dir / "fastf1"))
+
+        # FastF1 expects the cache directory to already exist. Ensure the
+        # subfolder is created before enabling the cache to avoid a
+        # ``NotADirectoryError`` on first run.
+        fastf1_cache = self.cache_dir / "fastf1"
+        fastf1_cache.mkdir(parents=True, exist_ok=True)
+        fastf1.Cache.enable_cache(str(fastf1_cache))
 
     def _rate_limited_get(self, url: str) -> requests.Response:
         wait_time = 0.25 - (time.time() - DataLoader._last_request)
