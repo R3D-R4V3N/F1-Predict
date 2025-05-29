@@ -20,6 +20,38 @@ from .feature_engineering import MODEL_PATH, _convert_time_to_seconds, _ewm_feat
 
 LOGGER = logging.getLogger(__name__)
 
+# Fallback mapping of race order when the Ergast API does not yet contain a
+# schedule for a given season. This only includes a subset of rounds which is
+# sufficient for basic usage and unit tests.
+FALLBACK_SCHEDULE: dict[int, list[dict[str, object]]] = {
+    2025: [
+        {"round": 1, "raceName": "Bahrain Grand Prix", "slug": "bahrain"},
+        {"round": 2, "raceName": "Saudi Arabian Grand Prix", "slug": "saudiarabia"},
+        {"round": 3, "raceName": "Australian Grand Prix", "slug": "australia"},
+        {"round": 4, "raceName": "Japanese Grand Prix", "slug": "japan"},
+        {"round": 5, "raceName": "Chinese Grand Prix", "slug": "china"},
+        {"round": 6, "raceName": "Miami Grand Prix", "slug": "miami"},
+        {"round": 7, "raceName": "Emilia Romagna Grand Prix", "slug": "imola"},
+        {"round": 8, "raceName": "Monaco Grand Prix", "slug": "monaco"},
+        {"round": 9, "raceName": "Canadian Grand Prix", "slug": "canada"},
+        {"round": 10, "raceName": "Spanish Grand Prix", "slug": "spain"},
+        {"round": 11, "raceName": "Austrian Grand Prix", "slug": "austria"},
+        {"round": 12, "raceName": "British Grand Prix", "slug": "britain"},
+        {"round": 13, "raceName": "Hungarian Grand Prix", "slug": "hungary"},
+        {"round": 14, "raceName": "Belgian Grand Prix", "slug": "belgium"},
+        {"round": 15, "raceName": "Dutch Grand Prix", "slug": "netherlands"},
+        {"round": 16, "raceName": "Italian Grand Prix", "slug": "italy"},
+        {"round": 17, "raceName": "Azerbaijan Grand Prix", "slug": "azerbaijan"},
+        {"round": 18, "raceName": "Singapore Grand Prix", "slug": "singapore"},
+        {"round": 19, "raceName": "United States Grand Prix", "slug": "usa"},
+        {"round": 20, "raceName": "Mexico City Grand Prix", "slug": "mexico"},
+        {"round": 21, "raceName": "São Paulo Grand Prix", "slug": "brazil"},
+        {"round": 22, "raceName": "Las Vegas Grand Prix", "slug": "lasvegas"},
+        {"round": 23, "raceName": "Qatar Grand Prix", "slug": "qatar"},
+        {"round": 24, "raceName": "Abu Dhabi Grand Prix", "slug": "abudhabi"},
+    ]
+}
+
 DATASET_PATH = Path("data/processed/f1_dataset.parquet")
 MODELS_DIR = Path("models")
 
@@ -67,6 +99,15 @@ def _parse_race_id(race_id: str) -> Tuple[int, int]:
         if slug in norm.replace(" ", ""):
             rnd = int(row.get("round") or row.get("Round"))
             return year, rnd
+
+    # If Ergast doesn't provide the schedule yet, fall back to the
+    # built-in mapping for known seasons.
+    fallback = FALLBACK_SCHEDULE.get(year)
+    if fallback is not None:
+        for row in fallback:
+            norm = row["slug"]
+            if slug == norm:
+                return year, int(row["round"])
     raise ValueError(f"Race '{race_id}' not found")
 
 
@@ -89,6 +130,10 @@ def _prepare_prediction_dataframe(df_hist: pd.DataFrame, year: int, rnd: int) ->
         "racefans_rating",
         "air_temp",
         "humidity",
+        "circuit_id",
+        "track_length",
+        "pit_stops",
+        "overtake_difficulty",
     ]:
         if col in latest.columns:
             latest[col] = np.nan
@@ -104,9 +149,21 @@ def _prepare_prediction_dataframe(df_hist: pd.DataFrame, year: int, rnd: int) ->
     if "FastestLapSpeed" in df_all.columns:
         df_all.rename(columns={"FastestLapSpeed": "fastest_lap_speed"}, inplace=True)
 
+    if "track_length" in df_all.columns:
+        df_all["track_length"] = pd.to_numeric(df_all["track_length"], errors="coerce")
+    else:
+        df_all["track_length"] = np.nan
+    df_all["overtake_difficulty"] = 1 / df_all["track_length"]
+    if "pit_stops" in df_all.columns:
+        df_all["pit_stops"] = pd.to_numeric(df_all["pit_stops"], errors="coerce")
+    else:
+        df_all["pit_stops"] = np.nan
+    if "circuit_id" not in df_all.columns:
+        df_all["circuit_id"] = np.nan
+
     df_all.sort_values(["driver_id", "year", "round"], inplace=True)
 
-    for col in ["Points", "Position", "fastest_lap_time", "fastest_lap_speed"]:
+    for col in ["Points", "Position", "fastest_lap_time", "fastest_lap_speed", "pit_stops"]:
         if col in df_all.columns:
             feat_name = f"{col.lower()}_ewm"
             df_all[feat_name] = _ewm_feature(df_all, col)
@@ -125,11 +182,16 @@ def _prepare_prediction_dataframe(df_hist: pd.DataFrame, year: int, rnd: int) ->
         numeric_features.append("fastest_lap_time")
     if "fastest_lap_speed" in df_all.columns:
         numeric_features.append("fastest_lap_speed")
+    if "track_length" in df_all.columns:
+        numeric_features.append("track_length")
+        numeric_features.append("overtake_difficulty")
+    if "pit_stops" in df_all.columns:
+        numeric_features.append("pit_stops")
     if "air_temp" in df_all.columns:
         numeric_features.append("air_temp")
     if "humidity" in df_all.columns:
         numeric_features.append("humidity")
-    for col in ["points_cumsum", "points_ewm", "position_ewm", "fastest_lap_time_ewm", "fastest_lap_speed_ewm"]:
+    for col in ["points_cumsum", "points_ewm", "position_ewm", "fastest_lap_time_ewm", "fastest_lap_speed_ewm", "pit_stops_ewm"]:
         if col in df_all.columns:
             numeric_features.append(col)
 
@@ -137,6 +199,8 @@ def _prepare_prediction_dataframe(df_hist: pd.DataFrame, year: int, rnd: int) ->
     categorical_features = ["driver_id"]
     if "TeamName" in df_all.columns:
         categorical_features.append("TeamName")
+    if "circuit_id" in df_all.columns:
+        categorical_features.append("circuit_id")
     feature_cols = numeric_features + categorical_features
 
     preprocessor: ColumnTransformer = joblib.load(MODEL_PATH)
