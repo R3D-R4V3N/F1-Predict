@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import TimeSeriesSplit
 import pytest
+import requests
 
 from f1_predictor.data_loader import DataLoader
 from f1_predictor.feature_engineering import generate_feature_matrix
