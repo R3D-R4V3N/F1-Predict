@@ -23,6 +23,14 @@ class DummyResponse:
         pass
 
 
+class DummyCSVResponse:
+    def __init__(self, text: str) -> None:
+        self.content = text.encode()
+
+    def raise_for_status(self) -> None:  # pragma: no cover - no error
+        pass
+
+
 def test_cache_hit(tmp_path, monkeypatch) -> None:
     data = {"MRData": {"RaceTable": {"Races": [{"round": 1}]}}}
 
@@ -42,14 +50,12 @@ def test_cache_hit(tmp_path, monkeypatch) -> None:
 
 def test_rollings() -> None:
     df = pd.DataFrame({"driver_id": [1] * 10, "score": np.arange(10)})
-    df["driver_recent_avg"] = (
-        df.groupby("driver_id")["score"].apply(
-            lambda s: s.shift(1).rolling(window=5, min_periods=1).mean()
-        )
+    df["driver_recent_avg"] = df.groupby("driver_id")["score"].apply(
+        lambda s: s.shift(1).rolling(window=5, min_periods=1).mean()
     )
     for i in range(len(df)):
         start = max(0, i - 5)
-        expected = df.loc[start:i - 1, "score"].mean() if i > 0 else np.nan
+        expected = df.loc[start : i - 1, "score"].mean() if i > 0 else np.nan
         if np.isnan(expected):
             assert np.isnan(df.loc[i, "driver_recent_avg"])
         else:
@@ -64,3 +70,18 @@ def test_tsplit_order() -> None:
         assert list(train_idx) == sorted(train_idx)
         assert list(val_idx) == sorted(val_idx)
 
+
+def test_racefans_fallback(tmp_path, monkeypatch) -> None:
+    csv_data = "year,round,rating\n2019,1,7.5\n"
+
+    def fake_get(self, url: str):
+        if "main" in url:
+            raise requests.HTTPError("404")
+        return DummyCSVResponse(csv_data)
+
+    monkeypatch.setattr(DataLoader, "_rate_limited_get", fake_get)
+
+    loader = DataLoader(cache_dir=tmp_path / "cache", raw_dir=tmp_path / "raw")
+    rating = loader.fetch_racefans_rating(2019, 1)
+
+    assert rating == 7.5

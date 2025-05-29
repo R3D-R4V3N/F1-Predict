@@ -29,7 +29,9 @@ def retry(backoff: int = 2) -> Callable[[Callable[..., Any]], Callable[..., Any]
                 except Exception:  # pragma: no cover - runtime errors
                     if attempt == 2:
                         raise
-                    LOGGER.exception("Error in %s, retrying in %s seconds", func.__name__, delay)
+                    LOGGER.exception(
+                        "Error in %s, retrying in %s seconds", func.__name__, delay
+                    )
                     time.sleep(delay)
                     delay *= backoff
             return None
@@ -44,7 +46,9 @@ class DataLoader:
 
     _last_request: float = 0.0
 
-    def __init__(self, cache_dir: str | Path | None = None, raw_dir: str | Path | None = None) -> None:
+    def __init__(
+        self, cache_dir: str | Path | None = None, raw_dir: str | Path | None = None
+    ) -> None:
         self.cache_dir = Path(cache_dir or ".cache")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.raw_dir = Path(raw_dir or "data/raw")
@@ -94,7 +98,9 @@ class DataLoader:
         return pd.DataFrame(races)
 
     @retry()
-    def fetch_session(self, year: int, round: int, session: str = "R") -> fastf1.core.Session:
+    def fetch_session(
+        self, year: int, round: int, session: str = "R"
+    ) -> fastf1.core.Session:
         """Fetch a FastF1 session."""
         s = fastf1.get_session(year, round, session)
         s.load()
@@ -103,12 +109,29 @@ class DataLoader:
     @retry()
     def fetch_racefans_rating(self, year: int, round: int) -> Optional[float]:
         """Fetch racefans driver rating for a specific race."""
-        url = (
+        urls = [
+            "https://raw.githubusercontent.com/theoehrly/fastf1/main/docs/examples/"
+            "racefans_driver_ratings.csv",
             "https://raw.githubusercontent.com/theoehrly/fastf1/master/docs/examples/"
-            "racefans_driver_ratings.csv"
-        )
+            "racefans_driver_ratings.csv",
+        ]
         dest = self.raw_dir / "racefans" / "driver_ratings.csv"
-        self._download_csv(url, dest)
+
+        for url in urls:
+            try:
+                self._download_csv(url, dest)
+                break
+            except requests.HTTPError:  # pragma: no cover - network failure
+                LOGGER.warning("Failed to fetch ratings from %s", url)
+                if dest.exists():
+                    dest.unlink()
+        else:
+            LOGGER.error("Unable to download racefans driver ratings")
+            return None
+
+        if not dest.exists():
+            return None
+
         df = pd.read_csv(dest)
         row = df[(df["year"] == year) & (df["round"] == round)]
         if row.empty:
