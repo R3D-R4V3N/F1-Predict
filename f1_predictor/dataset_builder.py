@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import time
 from pathlib import Path
 from typing import Iterable
 
@@ -31,10 +32,27 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
     """
     loader = DataLoader()
     frames: list[pd.DataFrame] = []
+    processed_races: set[tuple[int, int]] = set()
+
+    if PROCESSED_PATH.exists():
+        existing = pd.read_parquet(PROCESSED_PATH)
+        frames.append(existing)
+        processed_races = set(
+            zip(existing["year"].astype(int), existing["round"].astype(int))
+        )
+        LOGGER.info("Loaded existing dataset with %s rows", len(existing))
 
     for year in seasons:
         LOGGER.info("Fetching season %s", year)
-        races = loader.fetch_season(year)
+        while True:
+            try:
+                races = loader.fetch_season(year)
+                break
+            except Exception:
+                LOGGER.exception(
+                    "Failed to fetch season %s, retrying in 5 seconds", year
+                )
+                time.sleep(5)
         if races.empty:
             continue
         for _, race in races.iterrows():
@@ -42,8 +60,21 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
                 rnd = int(race.get("round") or race.get("Round"))
             except Exception:
                 continue
+            if (year, rnd) in processed_races:
+                LOGGER.info("Skipping %s round %s (already processed)", year, rnd)
+                continue
             LOGGER.info("Processing %s round %s", year, rnd)
-            session = loader.fetch_session(year, rnd, "R")
+            while True:
+                try:
+                    session = loader.fetch_session(year, rnd, "R")
+                    break
+                except Exception:
+                    LOGGER.exception(
+                        "Failed to fetch session %s round %s, retrying in 5 seconds",
+                        year,
+                        rnd,
+                    )
+                    time.sleep(5)
             results = getattr(session, "results", pd.DataFrame()).copy()
             if results.empty:
                 continue
@@ -52,6 +83,7 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
             rating = loader.fetch_racefans_rating(year, rnd)
             results["racefans_rating"] = rating
             frames.append(results)
+            processed_races.add((year, rnd))
 
     if not frames:
         raise RuntimeError("No data collected")
