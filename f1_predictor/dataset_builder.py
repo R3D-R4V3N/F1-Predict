@@ -17,13 +17,17 @@ LOGGER = logging.getLogger(__name__)
 PROCESSED_PATH = Path("data/processed/f1_dataset.parquet")
 
 
-def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
-    """Download and merge data for the given seasons.
+def build_dataset(seasons: Iterable[int], max_attempts: int = 5) -> pd.DataFrame:
+"""Download and merge data for the given seasons.
 
     Parameters
     ----------
     seasons:
         Years to include in the dataset.
+
+    max_attempts:
+        Maximum number of retries when fetching data before skipping a race
+        or season.
 
     Returns
     -------
@@ -44,7 +48,8 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
 
     for year in seasons:
         LOGGER.info("Fetching season %s", year)
-        while True:
+        races = pd.DataFrame()
+        for attempt in range(max_attempts):
             try:
                 races = loader.fetch_season(year)
                 break
@@ -53,6 +58,10 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
                     "Failed to fetch season %s, retrying in 5 seconds", year
                 )
                 time.sleep(5)
+        else:
+            LOGGER.error(
+                "Could not fetch season %s after %s attempts", year, max_attempts
+            )
         if races.empty:
             continue
         circuit_df = loader.parse_circuit_info(races)
@@ -69,7 +78,8 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
                 continue
             LOGGER.info("Processing %s round %s", year, rnd)
             skip_race = False
-            while True:
+            session = None
+            for attempt in range(max_attempts):
                 try:
                     session = loader.fetch_session(year, rnd, "R")
                     break
@@ -89,7 +99,15 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
                         rnd,
                     )
                     time.sleep(5)
-            if skip_race:
+            else:
+                LOGGER.error(
+                    "Could not fetch session %s round %s after %s attempts",
+                    year,
+                    rnd,
+                    max_attempts,
+                )
+                skip_race = True
+            if skip_race or session is None:
                 continue
             results = getattr(session, "results", pd.DataFrame()).copy()
             if results.empty:
@@ -175,13 +193,19 @@ def _cli(argv: Iterable[str] | None = None) -> None:
         nargs="*",
         help="Seasons to include e.g. 2018 2019 2020",
     )
+    parser.add_argument(
+        "--max-attempts",
+        type=int,
+        default=5,
+        help="Maximum retries for downloads",
+    )
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     seasons = args.seasons
     if not seasons:
         seasons = list(range(2018, pd.Timestamp.today().year + 1))
 
-    build_dataset(seasons)
+    build_dataset(seasons, max_attempts=args.max_attempts)
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point

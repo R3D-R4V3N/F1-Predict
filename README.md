@@ -33,7 +33,7 @@ The builder now loads this file if it exists and skips already processed races,
 allowing interrupted runs to resume where they left off.
 Run it with:
 ```bash
-python -m f1_predictor.dataset_builder --seasons 2019 2020 2021
+python -m f1_predictor.dataset_builder --seasons 2019 2020 2021 --max-attempts 3
 ```
 Without arguments it pulls all seasons from 2018 onwards.
 
@@ -71,7 +71,7 @@ python -m f1_predictor.predict_next_race --race 2025-Canada
 ## CLI cheat-sheet
 | Command | Purpose | Key options |
 |---------|---------|-------------|
-| `python -m f1_predictor.dataset_builder` | Build dataset | `--seasons 2019 2020` |
+| `python -m f1_predictor.dataset_builder` | Build dataset | `--seasons 2019 2020`, `--max-attempts 3` |
 | `python -m f1_predictor.model_training`  | Train model   | `--data <path>` |
 | `python -m f1_predictor.predict_next_race` | Predict upcoming GP | `--race YEAR-Slug` |
 
