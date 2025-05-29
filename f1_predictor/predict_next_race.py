@@ -20,6 +20,38 @@ from .feature_engineering import MODEL_PATH, _convert_time_to_seconds, _ewm_feat
 
 LOGGER = logging.getLogger(__name__)
 
+# Fallback mapping of race order when the Ergast API does not yet contain a
+# schedule for a given season. This only includes a subset of rounds which is
+# sufficient for basic usage and unit tests.
+FALLBACK_SCHEDULE: dict[int, list[dict[str, object]]] = {
+    2025: [
+        {"round": 1, "raceName": "Bahrain Grand Prix", "slug": "bahrain"},
+        {"round": 2, "raceName": "Saudi Arabian Grand Prix", "slug": "saudiarabia"},
+        {"round": 3, "raceName": "Australian Grand Prix", "slug": "australia"},
+        {"round": 4, "raceName": "Japanese Grand Prix", "slug": "japan"},
+        {"round": 5, "raceName": "Chinese Grand Prix", "slug": "china"},
+        {"round": 6, "raceName": "Miami Grand Prix", "slug": "miami"},
+        {"round": 7, "raceName": "Emilia Romagna Grand Prix", "slug": "imola"},
+        {"round": 8, "raceName": "Monaco Grand Prix", "slug": "monaco"},
+        {"round": 9, "raceName": "Canadian Grand Prix", "slug": "canada"},
+        {"round": 10, "raceName": "Spanish Grand Prix", "slug": "spain"},
+        {"round": 11, "raceName": "Austrian Grand Prix", "slug": "austria"},
+        {"round": 12, "raceName": "British Grand Prix", "slug": "britain"},
+        {"round": 13, "raceName": "Hungarian Grand Prix", "slug": "hungary"},
+        {"round": 14, "raceName": "Belgian Grand Prix", "slug": "belgium"},
+        {"round": 15, "raceName": "Dutch Grand Prix", "slug": "netherlands"},
+        {"round": 16, "raceName": "Italian Grand Prix", "slug": "italy"},
+        {"round": 17, "raceName": "Azerbaijan Grand Prix", "slug": "azerbaijan"},
+        {"round": 18, "raceName": "Singapore Grand Prix", "slug": "singapore"},
+        {"round": 19, "raceName": "United States Grand Prix", "slug": "usa"},
+        {"round": 20, "raceName": "Mexico City Grand Prix", "slug": "mexico"},
+        {"round": 21, "raceName": "São Paulo Grand Prix", "slug": "brazil"},
+        {"round": 22, "raceName": "Las Vegas Grand Prix", "slug": "lasvegas"},
+        {"round": 23, "raceName": "Qatar Grand Prix", "slug": "qatar"},
+        {"round": 24, "raceName": "Abu Dhabi Grand Prix", "slug": "abudhabi"},
+    ]
+}
+
 DATASET_PATH = Path("data/processed/f1_dataset.parquet")
 MODELS_DIR = Path("models")
 
@@ -67,6 +99,15 @@ def _parse_race_id(race_id: str) -> Tuple[int, int]:
         if slug in norm.replace(" ", ""):
             rnd = int(row.get("round") or row.get("Round"))
             return year, rnd
+
+    # If Ergast doesn't provide the schedule yet, fall back to the
+    # built-in mapping for known seasons.
+    fallback = FALLBACK_SCHEDULE.get(year)
+    if fallback is not None:
+        for row in fallback:
+            norm = row["slug"]
+            if slug == norm:
+                return year, int(row["round"])
     raise ValueError(f"Race '{race_id}' not found")
 
 
