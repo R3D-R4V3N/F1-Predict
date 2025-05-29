@@ -13,6 +13,35 @@ import pandas as pd
 import requests
 import fastf1
 
+FALLBACK_SCHEDULE: dict[int, list[dict[str, object]]] = {
+    2025: [
+        {"round": 1, "raceName": "Bahrain Grand Prix", "slug": "bahrain"},
+        {"round": 2, "raceName": "Saudi Arabian Grand Prix", "slug": "saudiarabia"},
+        {"round": 3, "raceName": "Australian Grand Prix", "slug": "australia"},
+        {"round": 4, "raceName": "Japanese Grand Prix", "slug": "japan"},
+        {"round": 5, "raceName": "Chinese Grand Prix", "slug": "china"},
+        {"round": 6, "raceName": "Miami Grand Prix", "slug": "miami"},
+        {"round": 7, "raceName": "Emilia Romagna Grand Prix", "slug": "imola"},
+        {"round": 8, "raceName": "Monaco Grand Prix", "slug": "monaco"},
+        {"round": 9, "raceName": "Canadian Grand Prix", "slug": "canada"},
+        {"round": 10, "raceName": "Spanish Grand Prix", "slug": "spain"},
+        {"round": 11, "raceName": "Austrian Grand Prix", "slug": "austria"},
+        {"round": 12, "raceName": "British Grand Prix", "slug": "britain"},
+        {"round": 13, "raceName": "Hungarian Grand Prix", "slug": "hungary"},
+        {"round": 14, "raceName": "Belgian Grand Prix", "slug": "belgium"},
+        {"round": 15, "raceName": "Dutch Grand Prix", "slug": "netherlands"},
+        {"round": 16, "raceName": "Italian Grand Prix", "slug": "italy"},
+        {"round": 17, "raceName": "Azerbaijan Grand Prix", "slug": "azerbaijan"},
+        {"round": 18, "raceName": "Singapore Grand Prix", "slug": "singapore"},
+        {"round": 19, "raceName": "United States Grand Prix", "slug": "usa"},
+        {"round": 20, "raceName": "Mexico City Grand Prix", "slug": "mexico"},
+        {"round": 21, "raceName": "São Paulo Grand Prix", "slug": "brazil"},
+        {"round": 22, "raceName": "Las Vegas Grand Prix", "slug": "lasvegas"},
+        {"round": 23, "raceName": "Qatar Grand Prix", "slug": "qatar"},
+        {"round": 24, "raceName": "Abu Dhabi Grand Prix", "slug": "abudhabi"},
+    ]
+}
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -93,8 +122,25 @@ class DataLoader:
         """Fetch season schedule and results from Ergast."""
         url = f"https://ergast.com/api/f1/{year}.json?limit=1000"
         dest = self.raw_dir / "ergast" / f"season_{year}.json"
-        data = self._download_json(url, dest)
-        races = data.get("MRData", {}).get("RaceTable", {}).get("Races", [])
+        try:
+            data = self._download_json(url, dest)
+        except Exception:
+            LOGGER.info("Falling back to built-in schedule for %s", year)
+            data = None
+
+        races = []
+        if data:
+            races = data.get("MRData", {}).get("RaceTable", {}).get("Races", [])
+
+        if not races and year in FALLBACK_SCHEDULE:
+            races = [
+                {
+                    "season": year,
+                    "round": r["round"],
+                    "raceName": r["raceName"],
+                }
+                for r in FALLBACK_SCHEDULE[year]
+            ]
         return pd.DataFrame(races)
 
     @retry()
