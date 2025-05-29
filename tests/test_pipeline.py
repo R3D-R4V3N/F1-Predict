@@ -92,12 +92,14 @@ def test_extract_weather() -> None:
     loader = DataLoader(cache_dir="none", raw_dir="none")
 
     class DummySession:
-        weather_data = pd.DataFrame({"AirTemp": [22.5], "Humidity": [55.0]})
+        weather_data = pd.DataFrame(
+            {"AirTemp": [22.5, 23.5, pd.NA], "Humidity": [55.0, pd.NA, 56.0]}
+        )
 
     weather = loader.extract_weather(DummySession())
 
-    assert weather["air_temp"] == 22.5
-    assert weather["humidity"] == 55.0
+    assert weather["air_temp"] == pytest.approx(23.0)
+    assert weather["humidity"] == pytest.approx(55.5)
 
 
 def test_feature_matrix_with_weather() -> None:

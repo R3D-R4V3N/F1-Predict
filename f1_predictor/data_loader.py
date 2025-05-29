@@ -199,11 +199,13 @@ class DataLoader:
         if weather is None or getattr(weather, "empty", True):
             return {"air_temp": None, "humidity": None}
 
-        row = weather.iloc[0]
-        air = pd.to_numeric(row.get("AirTemp"), errors="coerce")
-        hum = pd.to_numeric(row.get("Humidity"), errors="coerce")
+        air_series = pd.to_numeric(weather.get("AirTemp"), errors="coerce")
+        hum_series = pd.to_numeric(weather.get("Humidity"), errors="coerce")
+
+        air_mean = air_series.mean() if air_series is not None else float("nan")
+        hum_mean = hum_series.mean() if hum_series is not None else float("nan")
 
         return {
-            "air_temp": float(air) if not pd.isna(air) else None,
-            "humidity": float(hum) if not pd.isna(hum) else None,
+            "air_temp": float(air_mean) if not pd.isna(air_mean) else None,
+            "humidity": float(hum_mean) if not pd.isna(hum_mean) else None,
         }
