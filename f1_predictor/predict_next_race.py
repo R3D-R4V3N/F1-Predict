@@ -6,6 +6,7 @@ import argparse
 import logging
 from pathlib import Path
 from typing import Optional, Tuple
+import unicodedata
 
 import joblib
 import numpy as np
@@ -59,8 +60,11 @@ def _parse_race_id(race_id: str) -> Tuple[int, int]:
     schedule = loader.fetch_season(year)
     slug = slug.lower().replace(" ", "")
     for _, row in schedule.iterrows():
-        name = str(row.get("raceName") or row.get("RaceName") or "").lower()
-        if slug in name.replace(" ", ""):
+        name = str(row.get("raceName") or row.get("RaceName") or "")
+        norm = unicodedata.normalize("NFKD", name)
+        norm = "".join(c for c in norm if not unicodedata.combining(c))
+        norm = norm.lower()
+        if slug in norm.replace(" ", ""):
             rnd = int(row.get("round") or row.get("Round"))
             return year, rnd
     raise ValueError(f"Race '{race_id}' not found")
