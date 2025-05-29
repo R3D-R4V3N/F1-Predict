@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import time
 from pathlib import Path
 from typing import Iterable
 
@@ -34,7 +35,15 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
 
     for year in seasons:
         LOGGER.info("Fetching season %s", year)
-        races = loader.fetch_season(year)
+        while True:
+            try:
+                races = loader.fetch_season(year)
+                break
+            except Exception:
+                LOGGER.exception(
+                    "Failed to fetch season %s, retrying in 5 seconds", year
+                )
+                time.sleep(5)
         if races.empty:
             continue
         for _, race in races.iterrows():
@@ -43,7 +52,17 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
             except Exception:
                 continue
             LOGGER.info("Processing %s round %s", year, rnd)
-            session = loader.fetch_session(year, rnd, "R")
+            while True:
+                try:
+                    session = loader.fetch_session(year, rnd, "R")
+                    break
+                except Exception:
+                    LOGGER.exception(
+                        "Failed to fetch session %s round %s, retrying in 5 seconds",
+                        year,
+                        rnd,
+                    )
+                    time.sleep(5)
             results = getattr(session, "results", pd.DataFrame()).copy()
             if results.empty:
                 continue
