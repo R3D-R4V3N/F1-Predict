@@ -7,6 +7,7 @@ import pytest
 
 from f1_predictor.data_loader import DataLoader
 from f1_predictor.feature_engineering import generate_feature_matrix
+from f1_predictor import dataset_builder
 
 
 class DummyResponse:
@@ -116,3 +117,42 @@ def test_feature_matrix_with_weather() -> None:
     X, _ = generate_feature_matrix(df)
     assert any("air_temp" in c for c in X.columns)
     assert any("humidity" in c for c in X.columns)
+
+
+def test_build_dataset_creates_processed_dir(tmp_path, monkeypatch) -> None:
+    class DummySession:
+        results = pd.DataFrame({"DriverNumber": [1], "Position": [1]})
+
+        def get_circuit_info(self):
+            return {"Length": "5.0"}
+
+    class DummyLoader:
+        def __init__(self, *_, **__):
+            pass
+
+        def fetch_season(self, year: int) -> pd.DataFrame:
+            return pd.DataFrame({"round": [1], "season": [year]})
+
+        def parse_circuit_info(self, races: pd.DataFrame) -> pd.DataFrame:
+            return pd.DataFrame({"year": races["season"], "round": races["round"]})
+
+        def fetch_session(self, year: int, rnd: int, session: str) -> DummySession:
+            return DummySession()
+
+        def fetch_pit_summary(self, year: int, rnd: int) -> pd.DataFrame:
+            return pd.DataFrame({"driverId": [1]})
+
+        def fetch_racefans_rating(self, year: int, rnd: int) -> float:
+            return 7.0
+
+        def extract_weather(self, session: DummySession) -> dict[str, float]:
+            return {"air_temp": 20.0, "humidity": 55.0}
+
+    processed_path = tmp_path / "data" / "processed" / "f1.parquet"
+    monkeypatch.setattr(dataset_builder, "PROCESSED_PATH", processed_path)
+    monkeypatch.setattr(dataset_builder, "DataLoader", DummyLoader)
+
+    df = dataset_builder.build_dataset([2021])
+
+    assert processed_path.exists()
+    assert not df.empty

@@ -161,6 +161,7 @@ def build_dataset(seasons: Iterable[int]) -> pd.DataFrame:
         df.rename(columns={df.columns[0]: "driver_id"}, inplace=True)
 
     df = df.drop_duplicates(subset=["year", "round", "driver_id"])
+    PROCESSED_PATH.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(PROCESSED_PATH, index=False)
     LOGGER.info("Saved dataset to %s", PROCESSED_PATH)
     return df
