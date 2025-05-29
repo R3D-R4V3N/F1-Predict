@@ -18,7 +18,7 @@ PROCESSED_PATH = Path("data/processed/f1_dataset.parquet")
 
 
 def build_dataset(seasons: Iterable[int], max_attempts: int = 5) -> pd.DataFrame:
-"""Download and merge data for the given seasons.
+    """Download and merge data for the given seasons.
 
     Parameters
     ----------
